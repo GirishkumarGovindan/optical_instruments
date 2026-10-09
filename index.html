@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NCERT Class 12 Ray Optics Lab – Microscope & Telescopes</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f1f5f9;--panel:#fff;--ink:#0f172a;--dim:#64748b;--line:#cbd5e1;--acc:#0369a1;--accfg:#fff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#030712;--panel:#0d1527;--ink:#f1f5f9;--dim:#94a3b8;--line:#1e293b;--acc:#38bdf8;--accfg:#020617}}
+:root[data-theme="dark"]{--bg:#030712;--panel:#0d1527;--ink:#f1f5f9;--dim:#94a3b8;--line:#1e293b;--acc:#38bdf8;--accfg:#020617}
+*{box-sizing:border-box;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{background:var(--bg);color:var(--ink);padding:12px;display:flex;justify-content:center}
+.shell{max-width:1150px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line)}
+h1{font-size:1.1rem;color:var(--acc);flex:1 1 280px}
+button{background:transparent;color:var(--ink);border:1px solid var(--line);padding:7px 13px;border-radius:7px;font-weight:600;font-size:.82rem;cursor:pointer}
+button:hover{border-color:var(--acc)}button.on{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+canvas{width:100%;aspect-ratio:1000/520;display:block}
+input[type=range]{accent-color:var(--acc);cursor:pointer}
+label{font-size:.8rem;color:var(--dim)}
+.sl{display:flex;flex-direction:column;gap:2px;min-width:170px;flex:1}
+.sl b{color:var(--ink);font-weight:600}
+.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:14px;padding:14px 18px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:.86rem;line-height:1.6}
+.card h3{font-size:.92rem;color:var(--acc);margin-bottom:6px}
+.st{padding:5px 8px;border-left:3px solid transparent;border-radius:4px;cursor:pointer;color:var(--dim)}
+.st.a{border-color:var(--acc);color:var(--ink);background:rgba(56,189,248,.1)}
+.st b{color:var(--ink)}
+.f{font-family:"Cambria Math",Georgia,serif;font-size:.98rem;margin:5px 0}
+.kv{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding:2px 0}
+.kv span:last-child{font-weight:700;color:var(--acc)}
+</style></head><body>
+<div class="shell">
+<div class="row"><h1>Ray Optics Lab · Compound Microscope & Telescopes</h1><div id="nav" class="row" style="padding:0;border:0">
+<button data-m="micro_d" class="on">Microscope (image at D)</button><button data-m="micro_inf">Microscope (image at ∞)</button><button data-m="tele">Refracting Telescope</button><button data-m="cass">Cassegrain Reflector</button></div></div>
+<canvas id="cv"></canvas>
+<div class="row">
+<button id="play">▶ Play</button><button id="replay">↺ Replay</button><button id="prev">◀ Step</button><button id="next">Step ▶</button>
+<div class="sl"><label>Animation <b id="pl">100%</b></label><input type="range" id="sc" min="0" max="1000" value="1000"></div>
+<div class="sl" style="max-width:130px"><label>Speed <b id="spl">1×</b></label><input type="range" id="sp" min="0.3" max="3" step="0.1" value="1"></div>
+</div>
+<div class="row" id="tg">
+<label><input type="checkbox" data-k="t3" checked> 3rd ray</label><label><input type="checkbox" data-k="tv" checked> Back-extensions</label>
+<label><input type="checkbox" data-k="td" checked> Distances</label><label><input type="checkbox" data-k="ta" checked> Axial bundle (telescope)</label>
+</div>
+<div class="row" id="ctl"></div>
+<div class="grid"><div class="card"><h3>Construction sequence (click a step)</h3><div id="steps"></div></div>
+<div class="card"><h3>Live physics (this diagram: 10 px = 1 cm)</h3><div id="info"></div></div></div>
+</div>
+<script>
+const W=1000,H=520,CY=262,cv=document.getElementById('cv'),ctx=cv.getContext('2d'),$=id=>document.getElementById(id);
+const S={mode:'micro_d',p:1,run:false,speed:1,show:{t3:1,tv:1,td:1,ta:1}};
+const P={fo:75,uo:105,fe:140,fo2:260,fe2:80,al:.06,a3:0,fe3:60,h:22};
+let cur,C,sc=1,dirty=true,lastStep=-1,lastInfo='';
+const pal=()=>{const d=matchMedia('(prefers-color-scheme:dark)').matches&&document.documentElement.dataset.theme!=='light'||document.documentElement.dataset.theme==='dark';
+C=d?{bd:'#0b1220',ink:'#e2e8f0',dim:'#64748b',gl:'rgba(56,189,248,.2)',gs:'#38bdf8',r1:'#fbbf24',r2:'#22d3ee',r3:'#f472b6',ax:'#4ade80',vi:'#c084fc',ob:'#4ade80',im:'#fb7185'}
+:{bd:'#fff',ink:'#0f172a',dim:'#64748b',gl:'rgba(3,105,161,.12)',gs:'#0369a1',r1:'#d97706',r2:'#0891b2',r3:'#db2777',ax:'#16a34a',vi:'#7c3aed',ob:'#15803d',im:'#e11d48'};dirty=true};
+pal();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',pal);
+const cl=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),cm=v=>(v/10).toFixed(1),pt=(x,y)=>({x,y});
+const CTRL={micro_d:[['fo','Objective f₀',50,90,1,v=>cm(v)+' cm'],['uo','Object distance |u₀|',90,170,1,v=>cm(v)+' cm'],['fe','Eyepiece fₑ',100,200,1,v=>cm(v)+' cm']],
+micro_inf:null,tele:[['fo2','Objective f₀',200,340,1,v=>cm(v)+' cm'],['fe2','Eyepiece fₑ',50,140,1,v=>cm(v)+' cm'],['al','Angle α',.02,.08,.005,v=>(v*57.296).toFixed(1)+'°']],
+cass:[['a3','Star angle α',0,.03,.002,v=>(v*57.296).toFixed(2)+'°'],['fe3','Eyepiece fₑ',40,90,1,v=>cm(v)+' cm']]};
+CTRL.micro_inf=CTRL.micro_d;
+function buildCtl(){$('ctl').innerHTML='';CTRL[S.mode].forEach(([k,l,mn,mx,st,f])=>{const d=document.createElement('div');d.className='sl';
+d.innerHTML=`<label>${l}: <b>${f(P[k])}</b></label><input type="range" min="${mn}" max="${mx}" step="${st}" value="${P[k]}">`;
+d.querySelector('input').oninput=e=>{P[k]=+e.target.value;d.querySelector('b').textContent=f(P[k]);dirty=true;lastInfo=''};$('ctl').appendChild(d)})}
+
+/* ---------- drawing primitives ---------- */
+function txt(s,x,y,col,sz=12,al='center'){ctx.fillStyle=col;ctx.font=`600 ${sz}px system-ui,sans-serif`;ctx.textAlign=al;ctx.fillText(s,x,y)}
+function arrow(x,y,a,col){ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x+7*Math.cos(a),y+7*Math.sin(a));ctx.lineTo(x-7*Math.cos(a-.45),y-7*Math.sin(a-.45));ctx.lineTo(x-7*Math.cos(a+.45),y-7*Math.sin(a+.45));ctx.fill()}
+function cum(p){const c=[0];for(let i=1;i<p.length;i++)c.push(c[i-1]+Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y));return c}
+function stroke(p,dl,col,w=2,dash=null,arr=true,head=false){const c=cum(p);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.setLineDash(dash||[]);ctx.beginPath();ctx.moveTo(p[0].x,p[0].y);let hx=p[0].x,hy=p[0].y;
+for(let i=1;i<p.length;i++){const a=p[i-1],b=p[i];if(dl>=c[i]){ctx.lineTo(b.x,b.y);hx=b.x;hy=b.y}else{const r=cl((dl-c[i-1])/(c[i]-c[i-1]));hx=a.x+(b.x-a.x)*r;hy=a.y+(b.y-a.y)*r;ctx.lineTo(hx,hy);break}}
+ctx.stroke();ctx.setLineDash([]);
+if(arr)for(let i=1;i<p.length;i++){const a=p[i-1],b=p[i],L=c[i]-c[i-1];if(L>80&&dl>=c[i-1]+L*.55)arrow(a.x+(b.x-a.x)*.55,a.y+(b.y-a.y)*.55,Math.atan2(b.y-a.y,b.x-a.x),col)}
+if(head&&dl>0&&dl<c[c.length-1]){ctx.fillStyle=C.ink;ctx.beginPath();ctx.arc(hx,hy,3,0,7);ctx.fill()}}
+function lens(x,hh,tw,label){ctx.beginPath();ctx.moveTo(x,CY-hh);ctx.quadraticCurveTo(x+tw*2,CY,x,CY+hh);ctx.quadraticCurveTo(x-tw*2,CY,x,CY-hh);ctx.fillStyle=C.gl;ctx.fill();ctx.strokeStyle=C.gs;ctx.lineWidth=2;ctx.stroke();
+ctx.fillStyle=C.gs;[-1,1].forEach(s=>{const y=CY+s*hh;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-5,y-s*9);ctx.lineTo(x+5,y-s*9);ctx.fill()});txt(label,x,CY-hh-10,C.gs,12)}
+function mk(x,l,dy=17){ctx.fillStyle=C.ink;ctx.beginPath();ctx.arc(x,CY,3,0,7);ctx.fill();txt(l,x,CY+dy,C.ink,11)}
+function vec(x,tipY,col,top,base,al=1,grow=1){if(al<=0)return;ctx.save();ctx.globalAlpha=al;const y=CY+(tipY-CY)*grow,s=tipY<CY?-1:1;ctx.strokeStyle=ctx.fillStyle=col;ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(x,CY);ctx.lineTo(x,y);ctx.stroke();
+if(grow>.7){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-5,y-s*10);ctx.lineTo(x+5,y-s*10);ctx.fill();txt(top,x-13,y+(s<0?-4:14),col,13);txt(base,x+12,CY+(s<0?15:-7),col,12)}ctx.restore()}
+function dim(a,b,y,l){if(!S.show.td)return;ctx.strokeStyle=C.dim;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(a,y);ctx.lineTo(b,y);ctx.moveTo(a,y-5);ctx.lineTo(a,y+5);ctx.moveTo(b,y-5);ctx.lineTo(b,y+5);ctx.stroke();txt(l,(a+b)/2,y-5,C.dim,11)}
+function eye(x){ctx.strokeStyle=C.ink;ctx.lineWidth=1.6;ctx.beginPath();ctx.ellipse(x+20,CY,24,30,0,0,7);ctx.stroke();ctx.beginPath();ctx.arc(x+4,CY,9,2.2,4.1);ctx.stroke();ctx.fillStyle=C.ink;ctx.beginPath();ctx.arc(x+22,CY,6,0,7);ctx.fill();txt('Eye',x+20,CY+48,C.ink,11)}
+function axis(x1,x2){ctx.strokeStyle=C.dim;ctx.lineWidth=1;ctx.setLineDash([8,6]);ctx.beginPath();ctx.moveTo(x1,CY);ctx.lineTo(x2,CY);ctx.stroke();ctx.setLineDash([])}
+function totalDL(rs){const m=Math.max(...rs.map(r=>cum(r.p).pop()));return cl((S.p-.1)/.68)*m}
+function draw(rs,dl){rs.forEach(r=>{if(r.hide)return;stroke(r.p,dl,r.c,r.w||2,null,true,true)})}
+
+/* ---------- compound microscope: exact thin-lens tracing ---------- */
+function micro(near){const D=250,fo=P.fo,fe=P.fe,h=P.h,uo=Math.max(P.uo,fo*1.15,300*fo/(300-fo)+1),vo=fo*uo/(uo-fo),ue=near?D*fe/(D+fe):fe;
+const x0=60,xo=x0+uo,xi=xo+vo,xe=xi+ue,xE=xe+110,y0=CY-h,rs=[];
+[[-h,P.r1],[0,P.r2],[h*fo/(uo-fo),P.r3]].forEach(([hr],i)=>{const m0=(CY+hr-y0)/uo,m1=m0-hr/fo,yi=CY+hr+m1*vo,yl=CY+hr+m1*(xe-xo),m2=m1-(yl-CY)/fe,ye=yl+m2*(xE-xe);
+rs.push({p:[pt(x0,y0),pt(xo,CY+hr),pt(xi,yi),pt(xe,yl),pt(xE,ye)],c:[C.r1,C.r2,C.r3][i],hide:i==2&&!S.show.t3,m2,yl,yi})});
+const xV=xe-D,yV=rs[1].yl-rs[1].m2*D,xmin=Math.min(x0,near?xV:xe-220)-25,hi=h*vo/uo;
+const cI=cum(rs[0].p),mE=near?1+D/fe:D/fe,mt=-(vo/uo)*mE,L=(xe-fe)-(xo+fo);
+const st=[0,.1,.1+.68*cI[2]/Math.max(...rs.map(r=>cum(r.p).pop())),.1+.68*cI[3]/Math.max(...rs.map(r=>cum(r.p).pop())),.78];
+return{b:[xmin,xE+60,Math.max(190,Math.abs(yV-CY)+30)],st,
+info:[['Objective: 1/v₀ − 1/u₀ = 1/f₀',`${cm(vo)} cm, ${cm(uo)} cm, ${cm(fo)} cm ✓`],['m₀ = v₀/|u₀|',(vo/uo).toFixed(2)],[near?'mₑ = 1 + D/fₑ':'mₑ = D/fₑ',mE.toFixed(2)],['Exact m = −m₀·mₑ',mt.toFixed(2)],['Tube length L (F′₀ to Fₑ)',cm(L)+' cm'],['NCERT approx −(L/f₀)·mₑ',(-(L/fo)*mE).toFixed(2)],['Final image',near?'virtual, inverted, at D = 25 cm':'virtual, inverted, at ∞']],
+f:near?'<div class="f"><i>m</i> = −(<i>v</i>₀/|<i>u</i>₀|)(1 + <i>D</i>/<i>f</i>ₑ) ≈ −(<i>L</i>/<i>f</i>₀)(1 + <i>D</i>/<i>f</i>ₑ)</div><div class="f"><i>L</i> ≈ <i>v</i>₀ + |<i>u</i>ₑ| − <i>f</i>₀ − <i>f</i>ₑ… tube length (F′₀ → Fₑ)</div>':'<div class="f"><i>m</i> = −(<i>v</i>₀/|<i>u</i>₀|)(<i>D</i>/<i>f</i>ₑ) ≈ −(<i>L</i>/<i>f</i>₀)(<i>D</i>/<i>f</i>ₑ)</div><div class="f">Intermediate image A′B′ lies exactly at Fₑ → <i>L</i> ≈ <i>v</i>₀ + <i>f</i>ₑ</div>',
+draw(){const p=S.p;axis(20,W-20);lens(xo,95,9,'Objective (O)');lens(xe,150,13,'Eyepiece (E)');mk(xo,'O',-10);mk(xe,'E',-10);mk(xo-fo,'F₀');mk(xo+fo,'F′₀');mk(xe-fe,'Fₑ');mk(xe+fe,'F′ₑ');
+vec(x0,y0,C.ob,'A','B',1,cl(p/.1));const dl=totalDL(rs);draw(rs,dl);
+vec(xi,CY+hi,C.im,'A′','B′',cl((dl-cI[2]+8)/30)*(p>.1?1:0));
+const vf=cl((p-.78)/.2);if(S.show.tv&&vf>0){const ex=near?D:220;rs.forEach(r=>{if(r.hide)return;stroke([pt(xe,r.yl),pt(xe-ex,r.yl-r.m2*ex)],vf*ex*1.2,C.vi,1.6,[5,5],false)});
+if(near&&vf>.9)vec(xV,yV,C.vi,'A″','B″',1,1);else if(!near&&vf>.9)txt('Emergent rays parallel → final image at infinity (relaxed eye)',xe-60,CY+120,C.vi,12)}
+eye(xE);dim(x0,xo,CY+172,'|u₀|');dim(xo,xi,CY+172,'v₀');dim(xi,xe,CY+172,near?'|uₑ|':'uₑ = fₑ');dim(xo+fo,xe-fe,CY+198,'L (tube length)');
+if(near&&S.show.td)dim(xV,xe,CY-165,'D = 25 cm')}}}
+
+/* ---------- astronomical refracting telescope ---------- */
+function tele(){const fo=P.fo2,fe=P.fe2,a=P.al,xo=110,xi=xo+fo,xe=xi+fe,xE=xe+110,rs=[];
+[-80,0,80].forEach((hr,i)=>{const m1=a-hr/fo,yi=CY+a*fo,yl=CY+hr+m1*(xe-xo),m2=m1-(yl-CY)/fe;rs.push({p:[pt(30,CY+hr-a*(xo-30)),pt(xo,CY+hr),pt(xi,yi),pt(xe,yl),pt(xE,yl+m2*(xE-xe))],c:[C.r1,C.r2,C.r3][i],hide:i==2&&!S.show.t3,m2})});
+if(S.show.ta)[-55,55].forEach(hr=>{const m1=-hr/fo,yl=CY+hr+m1*(xe-xo);rs.push({p:[pt(30,CY+hr),pt(xo,CY+hr),pt(xi,CY),pt(xe,yl),pt(xE,yl)],c:C.ax,w:1.6})});
+const mx=Math.max(...rs.map(r=>cum(r.p).pop())),c0=cum(rs[0].p),beta=-rs[0].m2,imY=a*fo;
+return{b:[10,xE+60,185],st:[0,.1,.1+.68*c0[2]/mx,.1+.68*c0[3]/mx,.78],
+info:[['Magnifying power m = −f₀/fₑ',(-fo/fe).toFixed(2)],['Tube length L = f₀ + fₑ',cm(fo+fe)+' cm'],['Incident angle α',(a*57.296).toFixed(2)+'°'],['Emergent angle β = (f₀/fₑ)α',(Math.atan(fo/fe*a)*57.296).toFixed(2)+'°'],['Check m = β/α (magnitude)',(Math.abs(rs[0].m2)/a).toFixed(2)],['Final image','virtual, inverted, at ∞'],['A′B′ height f₀·tanα',cm(imY)+' cm']],
+f:'<div class="f"><i>m</i> = <i>β</i>/<i>α</i> = −<i>f</i>₀/<i>f</i>ₑ</div><div class="f"><i>L</i> = <i>f</i>₀ + <i>f</i>ₑ (normal adjustment)</div><div class="f">A′B′ forms at F′₀ ≡ Fₑ</div>',
+draw(){const p=S.p;axis(20,W-20);lens(xo,160,10,'Objective (O) – large f₀, large aperture');lens(xe,85,9,'Eyepiece (E)');mk(xo,'O',-10);mk(xe,'E',-10);mk(xi,'F′₀ ≡ Fₑ',32);
+txt('Rays from distant object (at ∞)',90,CY-190,C.dim,11);const dl=totalDL(rs);draw(rs,dl);
+vec(xi,CY+imY,C.im,'A′','B′',cl((dl-c0[2]+8)/30)*(p>.1?1:0));
+ctx.strokeStyle=C.dim;ctx.lineWidth=1;ctx.beginPath();ctx.arc(xo,CY,130,Math.PI,Math.PI+a);ctx.stroke();txt('α',xo-146,CY-9,C.dim,14);
+if(p>.78){ctx.beginPath();ctx.arc(xe,CY,100,-Math.abs(rs[0].m2),0);ctx.stroke();txt('β',xe+112,CY-8,C.dim,14);txt('Parallel bundle at angle β → image at ∞',xe-40,CY+135,C.vi,12)}
+eye(xE);dim(xo,xi,CY+185,'f₀');dim(xi,xe,CY+185,'fₑ')}}}
+
+/* ---------- Cassegrain reflector: exact reflection at paraboloid + hyperboloid ---------- */
+function root(f,t0,t1){let a=t0,fa=f(a);for(let i=1;i<=500;i++){const b=t0+(t1-t0)*i/500,fb=f(b);if(fa*fb<=0){let lo=a,hi=b;for(let k=0;k<40;k++){const m=(lo+hi)/2;f(lo)*f(m)<=0?hi=m:lo=m}return(lo+hi)/2}a=b;fa=fb}return null}
+const refl=(d,n)=>{const l=Math.hypot(n[0],n[1]),x=n[0]/l,y=n[1]/l,k=2*(d[0]*x+d[1]*y);return[d[0]-k*x,d[1]-k*y]};
+const xP=700,fp=250,F1=450,F2=790,xV=560,HYP=(x,y)=>Math.hypot(x-F2,y-CY)-Math.hypot(x-F1,y-CY)-(F1+F2-2*xV);
+function cass(){const a=P.a3,fe=P.fe3,xL=F2+fe,xE=xL+95,rs=[],virt=[],d=(l=>[1/l,Math.tan(a)/l])(Math.hypot(1,Math.tan(a)));
+[82,108,135].forEach(h=>[-1,1].forEach(s=>{const y0=CY+s*h-Math.tan(a)*(xP-40),t1=root(t=>{const x=40+d[0]*t,y=y0+d[1]*t;return x-xP+(y-CY)**2/(4*fp)},0,900);if(t1==null)return;
+const P1=pt(40+d[0]*t1,y0+d[1]*t1),d1=refl(d,[1,(P1.y-CY)/(2*fp)]),t2=root(t=>HYP(P1.x+d1[0]*t,P1.y+d1[1]*t),0,500);if(t2==null)return;
+const P2=pt(P1.x+d1[0]*t2,P1.y+d1[1]*t2),r1=Math.hypot(P2.x-F1,P2.y-CY),r2=Math.hypot(P2.x-F2,P2.y-CY),d2=refl(d1,[(P2.x-F2)/r2-(P2.x-F1)/r1,(P2.y-CY)/r2-(P2.y-CY)/r1]),m=d2[1]/d2[0],
+yF=P2.y+m*(F2-P2.x),yl=P2.y+m*(xL-P2.x),m2=m-(yl-CY)/fe;
+rs.push({p:[pt(40,y0),P1,P2,pt(F2,yF),pt(xL,yl),pt(xE,yl+m2*(xE-xL))],c:s<0?C.r1:C.r2,hide:h!=82&&h!=135&&!S.show.t3&&h==108,yF});
+virt.push([P2,pt(F1,P2.y+d1[1]/d1[0]*(F1-P2.x))])}));
+const mx=Math.max(...rs.map(r=>cum(r.p).pop())),c0=cum(rs[0].p),t=i=>.1+.68*c0[i]/mx,feff=fp*(F2-xV)/(xV-F1);
+const xs=[];for(let y=-66;y<=66;y+=3)xs.push(pt(root(x=>HYP(x,CY+y),F1+1,xP),CY+y));
+return{b:[10,xE+70,180],st:[0,.1,t(1),t(2),t(4)],
+info:[['Primary focal length f₁ (paraboloid)',cm(fp)+' cm'],['Secondary magnification (F₂−V)/(V−F₁)',((F2-xV)/(xV-F1)).toFixed(2)],['Effective focal length f₀ = f₁·m₂',cm(feff)+' cm'],['Magnifying power m = f₀/fₑ',(feff/fe).toFixed(1)],['Chromatic aberration','none (mirrors)'],['Spherical aberration','none (paraboloid on axis)']],
+f:'<div class="f"><i>m</i> = <i>f</i>₀/<i>f</i>ₑ = (<i>R</i>/2)/<i>f</i>ₑ (primary)</div><div class="f">M₂ is a convex hyperboloid: rays aimed at F₁ are reflected exactly through F₂.</div><div class="f" style="font-size:.84rem">Merits (NCERT): no chromatic aberration; parabolic mirror removes spherical aberration; compact tube, image formed behind M₁ with eyepiece easy to reach; large mirrors are lighter & supported from behind.</div>',
+draw(){const p=S.p;axis(20,W-20);ctx.strokeStyle=C.dim;ctx.lineWidth=1;[-1,1].forEach(s=>{ctx.beginPath();ctx.moveTo(250,CY+s*158);ctx.lineTo(xP-8,CY+s*158);ctx.stroke()});
+ctx.lineWidth=5;ctx.strokeStyle=C.gs;[-1,1].forEach(s=>{ctx.beginPath();for(let y=32;y<=150;y+=3)ctx[y==32?'moveTo':'lineTo'](xP-y*y/(4*fp)+0,CY+s*y);ctx.stroke();ctx.lineWidth=1;for(let y=36;y<=150;y+=9){const x=xP-y*y/(4*fp);ctx.beginPath();ctx.moveTo(x,CY+s*y);ctx.lineTo(x+12,CY+s*y+s*5);ctx.stroke()}ctx.lineWidth=5});
+ctx.strokeStyle=C.r1;ctx.lineWidth=4.5;ctx.beginPath();xs.forEach((q,i)=>i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y));ctx.stroke();
+txt('M₁ concave paraboloid (central hole)',xP-30,CY-168,C.gs,12);txt('M₂ convex hyperboloid',xV-40,CY-82,C.r1,12);
+mk(F1,'F₁ (focus of M₁)',-12);mk(F2,'F₂',-12);lens(xL,60,7,'Eyepiece');
+const dl=totalDL(rs);if(S.show.tv&&p>.2)virt.forEach(v=>stroke(v,1e4,C.vi,1.2,[4,5],false));draw(rs,dl);
+const yF=rs[0].yF-CY;if(p>.5)vec(F2,CY+yF,C.im,'A′','B′',cl((dl-c0[3]+8)/30)*(Math.abs(yF)>2?1:0));
+eye(xE);txt('parallel bundle → relaxed eye',xE-20,CY+100,C.vi,11)}}}
+
+const SC={micro_d:()=>micro(true),micro_inf:()=>micro(false),tele,cass};
+const STEPS={
+micro_d:[['Optical set-up','Draw the principal axis. Objective O (small aperture, small f₀) and eyepiece E (larger f, larger aperture). Mark Fo, F′o, Fe, F′e.'],['Rays through the objective','Object AB just beyond Fo. Ray 1 ∥ axis → passes F′o. Ray 2 through O is undeviated. Ray 3 through Fo → emerges ∥ axis.'],['Real intermediate image A′B′','All three rays meet at A′: real, inverted, magnified, formed inside the focal length of the eyepiece (|uₑ| < fₑ).'],['Refraction at the eyepiece','Rays cross at A′, diverge and strike E (acting as a simple magnifier); they bend but remain diverging.'],['Virtual final image at D','Back-extending the emergent rays (dotted) they meet at A″B″: virtual, inverted w.r.t. object, at the near point D = 25 cm.']],
+micro_inf:[['Optical set-up','Same lens pair; the tube length is now adjusted so that A′B′ falls exactly on Fₑ.'],['Rays through the objective','Ray 1 ∥ axis → F′o, ray 2 through O, ray 3 through Fo → ∥ axis.'],['A′B′ at the focus of E','Rays converge at A′, which coincides with the first focal point Fₑ of the eyepiece.'],['Refraction at the eyepiece','Rays from A′ (at Fₑ) hit E and emerge as a parallel bundle.'],['Image at infinity','Parallel rays enter the relaxed eye; final image at ∞ (dotted back-extensions never meet).']],
+tele:[['Optical set-up','Objective: large f₀ and aperture. Eyepiece: small fₑ. Common focal point F′o ≡ Fe, so L = f₀ + fₑ.'],['Parallel rays at angle α','Rays from a distant point A arrive parallel at angle α with the axis (gold/cyan/pink); rays from B lie along the axis (green).'],['Real image A′B′ at F′o','Each bundle converges to a point in the focal plane: off-axis bundle → A′, axial bundle → B′ (real, inverted, diminished).'],['Eyepiece','Rays diverge from A′ ( at Fₑ ) and are rendered parallel by the eyepiece.'],['Emergent angle β','Parallel bundle leaves at angle β; m = β/α = −f₀/fₑ. Image at ∞, inverted.']],
+cass:[['Optical set-up','Concave paraboloid primary M₁ with central hole, small convex hyperboloid secondary M₂, eyepiece behind M₁.'],['Parallel rays enter','Rays from the distant star run parallel to the axis; the ones that miss M₂ reach M₁.'],['Reflection at M₁','M₁ reflects every ray toward its principal focus F₁ (exact for a paraboloid).'],['Reflection at M₂','M₂ intercepts the rays before F₁ (dotted path = virtual) and reflects them back through the hole to F₂.'],['Eyepiece','Real image at F₂ is viewed through the eyepiece: compact tube with no chromatic aberration.']]};
+
+/* ---------- loop & UI ---------- */
+function fit(){const r=cv.getBoundingClientRect(),d=devicePixelRatio||1;cv.width=r.width*d;cv.height=r.width*H/W*d;sc=r.width/W*d;dirty=true}
+addEventListener('resize',fit);
+function render(){const g=SC[S.mode]();const[x0,x1,yb]=g.b,k=Math.min(1.5,(W-40)/(x1-x0),(H/2-8)/yb);
+ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=C.bd;ctx.fillRect(0,0,cv.width,cv.height);
+ctx.setTransform(sc*k,0,0,sc*k,sc*(W/2-k*(x0+x1)/2),sc*(CY-k*CY));g.draw();
+let a=0;g.st.forEach((t,i)=>{if(S.p>=t-.001)a=i});
+if(!lastInfo||lastInfo!==S.mode+JSON.stringify(g.info)){lastInfo=S.mode+JSON.stringify(g.info);
+$('info').innerHTML=g.f+g.info.map(r=>`<div class="kv"><span>${r[0]}</span><span>${r[1]}</span></div>`).join('')}
+if(a!==lastStep||dirty===2){lastStep=a;$('steps').innerHTML=STEPS[S.mode].map((s,i)=>`<div class="st ${i==a?'a':''}" data-i="${i}"><b>${i+1}. ${s[0]}.</b> ${s[1]}</div>`).join('');
+document.querySelectorAll('.st').forEach(e=>e.onclick=()=>{S.run=false;S.p=Math.min(1,g.st[+e.dataset.i]+.004);sync()})}
+$('sc').value=Math.round(S.p*1000);$('pl').textContent=Math.round(S.p*100)+'%';$('play').textContent=S.run?'⏸ Pause':'▶ Play';return g}
+function sync(){dirty=true}
+let prev=performance.now();
+(function loop(t){const dt=(t-prev)/1000;prev=t;if(S.run){S.p+=dt*.11*S.speed;if(S.p>=1){S.p=1;S.run=false}dirty=true}
+if(dirty){dirty=false;cur=render()}requestAnimationFrame(loop)})(prev);
+$('play').onclick=()=>{if(S.p>=1)S.p=0;S.run=!S.run;sync()};
+$('replay').onclick=()=>{S.p=0;S.run=true;sync()};
+$('sc').oninput=e=>{S.p=e.target.value/1000;S.run=false;sync()};
+$('sp').oninput=e=>{S.speed=+e.target.value;$('spl').textContent=S.speed.toFixed(1)+'×'};
+const stepGo=d=>{const st=cur.st;let a=0;st.forEach((t,i)=>{if(S.p>=t-.001)a=i});a=cl(a+d,0,st.length-1);S.p=a?Math.min(1,st[a]+.004):0;S.run=false;sync()};
+$('next').onclick=()=>stepGo(1);$('prev').onclick=()=>stepGo(-1);
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');S.mode=b.dataset.m;S.p=0;S.run=true;lastInfo='';lastStep=-1;buildCtl();sync()});
+document.querySelectorAll('#tg input').forEach(c=>c.onchange=()=>{S.show[c.dataset.k]=c.checked?1:0;sync()});
+buildCtl();fit();
+</script></body></html>
